@@ -1,0 +1,3 @@
+cd /mnt/progs/tg21
+docker build --tag tg21 .
+docker run -d --restart always --name TG21 --publish 3000:3000 tg21
