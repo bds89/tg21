@@ -33,15 +33,15 @@ SPEED485 = ('9600', '8O1') #str, tuple
 PKTSIZE = '1200' #bytes
 S_NO_DATA_TIMEOUT = '65535' #seconds, str
 S_CON_TIMEOUT = '300' #1/10 seconds, str
-S_PORT = '3000' #strы
+S_PORT = '3000' #str
 S_IP = '192.168.1.1' #str
 S_PASS = '1111' #str
-PERIODIC_RECONNECT = 43200 #seconds, int
+PERIODIC_RECONNECT = 86400 #seconds, int
 SMS_CHECK = 300 #seconds, int
 DEVICE_ADDRESS = 46 #int, < 255 (one byte)
 DEVICE_PASSWORD = '000000' #str, 6 chars
 DEVICE_A = 1250 #int, device energy constant
-VERSION = '1.16' #str
+VERSION = '1.17' #str
 
 def cmdAT(cmd, result, time_out, recursive_n = 0):
     if recursive_n > 2: MOD.sleep(30)
@@ -289,8 +289,7 @@ def main():
             MDM.send(RESPONCE+answer485+EOF, 0)
     if withsms == 1:
         sms_handler(DEVICE_ADDRESS, DEVICE_PASSWORD, DEVICE_A, 1)
-    else:
-        cmdAT('AT#REBOOT\r', 'OK', 2)
+    cmdAT('AT#REBOOT\r', 'OK', 2)
 
     
 
