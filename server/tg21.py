@@ -1396,7 +1396,7 @@ async def black_ip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         if not cursor.fetchall(): 
             cursor.execute('''INSERT INTO BlackIPs VALUES(?,?)''', (ip, datetime.datetime.now()))
             sqlite_connection.commit()
-            BLACK_IPS.append(ip)
+            BLACK_IPS.add(ip)
         await send_simple_message(ip+" in Black list", True)
         return True
     except Exception as e:
@@ -1475,7 +1475,7 @@ async def new_connection(reader, writer):
     if s_pass != CONFIG["SOCKET_PASS"]:
         text = f"Попытка авторизации адресом {addr!r}. Введен пароль {s_pass!r}. Соединение с адресом разорвано"
         logger.warning(text)
-        if addr:
+        if addr and transmitters.qsize() == 0:
             ip = addr[0]
             await send_simple_message(text, True, add_button=["BLACK LIST", "black_ip"+str(ip)])
         writer.close()
@@ -1486,6 +1486,9 @@ async def new_connection(reader, writer):
         old_task = transmitters.get_nowait()
         old_task.cancel()
     transmitters.put_nowait(task)
+    if addr:
+        text = f"Успешная авторизация с адреса {addr!r}"
+        await send_simple_message(text, True, add_button=["BLACK LIST", "black_ip"+str(addr[0])])
 
     timeout_EOF = 0
     while True:
@@ -1504,6 +1507,7 @@ async def new_connection(reader, writer):
             if transmitters.qsize() == 1: transmitters.get_nowait()
             writer.close()
             task.cancel()
+            await asyncio.sleep(1)
             await queue_rx.put("RX, ConnectionResetError")
             return
         
@@ -1544,6 +1548,7 @@ async def transmiter(writer):
             await writer.drain()
         except ConnectionResetError:
             logger.warning(f"TX, ConnectionResetError")
+            await asyncio.sleep(1)
             try: queue_rx.put_nowait("TX, ConnectionResetError")
             except asyncio.QueueFull: logger.error("queue_rx is full for TX, ConnectionResetError")
             finally: queue_tx.task_done()
@@ -1556,6 +1561,14 @@ async def queue_tx_put(request, wait=False):
         text = "Слишком много запрососов от пользователей, попробуйте повторить позднее"
         return text
     await queue_tx.put(request)
+    #clear old responce if it was
+    try:
+        text = await asyncio.wait_for(queue_rx.get(), 0.5)
+        logger.warning(f"Geted old responce!!!")
+        await send_simple_message("Geted old responce", True)
+    except asyncio.TimeoutError:
+        pass
+    #get new responce
     try:
         text = await asyncio.wait_for(queue_rx.get(), 40)
     except asyncio.TimeoutError:
@@ -1629,7 +1642,7 @@ if __name__ == '__main__':
     DB_PATCH = dir+SLASH+'users.db'
     sqlite_connection = sqlite3.connect(DB_PATCH)
     cursor = sqlite_connection.cursor()
-    BLACK_IPS = []
+    BLACK_IPS = set()
     try:
         cursor.execute("""CREATE TABLE if not exists users
                         (id integer NOT NULL UNIQUE, name text, surname text, auth text, tryn integer, notify integer)
@@ -1650,7 +1663,7 @@ if __name__ == '__main__':
         ips = cursor.fetchall()
         if ips:
             for ip in ips:
-                BLACK_IPS.append(ip[0])
+                BLACK_IPS.add(ip[0])
 
     except Exception as e:
         logger.error("Exception: %s at DB connect.", e)
