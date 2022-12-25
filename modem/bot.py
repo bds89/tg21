@@ -33,15 +33,15 @@ SPEED485 = ('9600', '8O1') #str, tuple
 PKTSIZE = '1200' #bytes
 S_NO_DATA_TIMEOUT = '65535' #seconds, str
 S_CON_TIMEOUT = '300' #1/10 seconds, str
-S_PORT = '3000' #str
+S_PORT = '3000' #strы
 S_IP = '192.168.1.1' #str
 S_PASS = '1111' #str
-PERIODIC_RECONNECT = 86400 #seconds, int
+PERIODIC_RECONNECT = 43200 #seconds, int
 SMS_CHECK = 300 #seconds, int
 DEVICE_ADDRESS = 46 #int, < 255 (one byte)
 DEVICE_PASSWORD = '000000' #str, 6 chars
 DEVICE_A = 1250 #int, device energy constant
-VERSION = '1.17' #str
+VERSION = '1.19' #str
 
 def cmdAT(cmd, result, time_out, recursive_n = 0):
     if recursive_n > 2: MOD.sleep(30)
@@ -67,23 +67,29 @@ def enable_script(filename):
     else:
         return 0
 
-def write_file(new_file):
+def write_file(new_file, file_code):
     cmdAT('+++', 'OK', 2)
-    MDM.send('AT#ESCRIPT?\r', 0)
-    timeout = MOD.secCounter() + 5
-    ok = MDM.receive(TIMEOUT_AT)
-    while (((ok.find("bot.pyo") == -1) and (ok.find("bot2.pyo") == -1)) and MOD.secCounter() < timeout):
-        ok = ok + MDM.receive(TIMEOUT_AT)
-    if ((ok.find("bot.pyo") == -1) and (ok.find("bot2.pyo") == -1)):
-        return 0
-    if (ok.find("bot.pyo") == -1): file_name = "bot.pyo"
-    else: file_name = "bot2.pyo"
+    if file_code == 1:
+        file_name = "sms.pyo"
+    elif file_code == 2:
+        file_name = "crc16.pyo"
+    else:
+        MDM.send('AT#ESCRIPT?\r', 0)
+        timeout = MOD.secCounter() + 5
+        ok = MDM.receive(TIMEOUT_AT)
+        while (((ok.find("bot.pyo") == -1) and (ok.find("bot2.pyo") == -1)) and MOD.secCounter() < timeout):
+            ok = ok + MDM.receive(TIMEOUT_AT)
+        if ((ok.find("bot.pyo") == -1) and (ok.find("bot2.pyo") == -1)):
+            return 0
+        if (ok.find("bot.pyo") == -1): file_name = "bot.pyo"
+        else: file_name = "bot2.pyo"
     try:
         f = open(file_name, "wb")
         try:
             f.write(new_file)
             f.flush()
             f.close()
+            if file_code != 0: return 1
             if (enable_script(file_name) == 1): 
                 return 1
             else: return 0
@@ -174,6 +180,20 @@ def check_device_addr485():
     if (request_crc != res): return 0
     else: return 1
 
+def internet_off():
+    f_name = "internet.txt"
+    try:
+        f = open(f_name, "a")
+        f.close()
+
+        f = open(f_name, "r")
+        internet = f.read()
+        f.close()
+        if internet != "off": return 0
+        else: return 1
+    except IOError:
+        return 0
+
 def main():
     operator, signal_str = init(
     SPEED485, 
@@ -201,6 +221,12 @@ def main():
             device_online = check_device_addr485()
     else: device_online = 1
 
+    #Only sms loop
+    if internet_off() == 1:
+        while(1==1):
+            sms_handler(DEVICE_ADDRESS, DEVICE_PASSWORD, DEVICE_A)
+            MOD.watchdogReset()
+            MOD.sleep(100)
     #socket config
     if (cmdAT('AT#SCFG=1,1,'+PKTSIZE+','+S_NO_DATA_TIMEOUT+','+S_CON_TIMEOUT+',50\r', 'OK', 2) == 0):
         cmdAT('AT#REBOOT\r', 'OK', 2)
@@ -239,7 +265,8 @@ def main():
             if request.find(FOTA) != -1:
                 fota_process = 1
                 MDM.send((RESPONCE+FOTA+str(int(PKTSIZE)-1)+EOF), 0)
-                file_lenght = int(request[len(FOTA):])
+                file_code = int(request[len(FOTA):len(FOTA)+1])
+                file_lenght = int(request[len(FOTA)+1:])
                 data_recieved = ""
                 pkt_recieved = ""
                 RESPONCE_TO = (int(PKTSIZE)/10)+10
@@ -269,7 +296,7 @@ def main():
 
                 #write data to file
                 if len(data_recieved) == file_lenght:
-                    w = write_file(data_recieved)
+                    w = write_file(data_recieved, file_code)
                     if w == 0:
                         MDM.send(RESPONCE+"Error in writing file"+EOF, 0)
                     else: 
@@ -289,7 +316,8 @@ def main():
             MDM.send(RESPONCE+answer485+EOF, 0)
     if withsms == 1:
         sms_handler(DEVICE_ADDRESS, DEVICE_PASSWORD, DEVICE_A, 1)
-    cmdAT('AT#REBOOT\r', 'OK', 2)
+    else:
+        cmdAT('AT#REBOOT\r', 'OK', 2)
 
     
 
@@ -307,7 +335,7 @@ if __name__ == '__main__':
     except Exception:
         cmdAT('+++', 'OK', 2)
         if smsinit() == 1:
-            MOD.sleep(30)  #time for recieve sms
+            MOD.sleep(300)  #time for recieve sms
             sms_handler(DEVICE_ADDRESS, DEVICE_PASSWORD, DEVICE_A)
         #change boot script
         cmdAT('+++', 'OK', 2)

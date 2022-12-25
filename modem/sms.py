@@ -38,7 +38,7 @@ def energy_to_text(responce, A):
         for i in value:
             energy_dec = energy_dec * 256 + ord(i)
             energyDictTxt.update({key:str(energy_dec/(2*A))})
-    text = text + "Active direct: "+energyDictTxt["Active direct"]+"\r\n"+\
+    text = text + "Active direct: "+energyDictTxt["Active direct"]+"\r\n\r\n"+\
                     "Reactive direct: "+energyDictTxt["Reactive direct"]+"\r\n"+\
                         "Active reverse: "+energyDictTxt["Active reverse"]+"\r\n"+\
                             "Reactive reverse: "+energyDictTxt["Reactive reverse"]+"\r\n"
@@ -52,6 +52,14 @@ def sendSMS(phone, text):
     else:
         return
 
+def internet(arg):
+    try:
+        f = open("internet.txt", "w")
+        f.write(arg)
+        f.flush()
+        f.close()
+    except IOError:
+        1==1
 
 def sms_handler(address, password, A, loop = 0):
     while (1==1):
@@ -81,10 +89,18 @@ def sms_handler(address, password, A, loop = 0):
             elif ((string.find("reboot") != -1 or string.find("Reboot") != -1 or string.find("REBOOT") != -1) and (key != "")):    #find the command of each sms
                 smsDict.update({key:"reboot"})
                 key = ""
+            elif ((string.find("interneton") != -1 or string.find("Interneton") != -1 or string.find("INTERNETON") != -1) and (key != "")):    #find the command of each sms
+                smsDict.update({key:"interneton"})
+                key = ""
+            elif ((string.find("internetoff") != -1 or string.find("Internetoff") != -1 or string.find("INTERNETOFF") != -1) and (key != "")):    #find the command of each sms
+                smsDict.update({key:"internetoff"})
+                key = ""
             else: continue
         if listIndex == []:
             if loop == 0: return
-            else: continue
+            else: 
+                MOD.sleep(10)
+                continue
         #delete all sms
         for index in listIndex:
             cmdAT('AT+CMGD='+index+'\r', 'OK', 5)
@@ -92,8 +108,10 @@ def sms_handler(address, password, A, loop = 0):
         
         # make requests
         for phone, command in smsDict.items():
-            if command == "reboot":
-                cmdAT('AT#REBOOT\r', 'OK', 5)
+            if command == "interneton":
+                internet("on")
+            if command == "internetoff":
+                internet("off")
             if command == "energy":
                 SER.read() #clear buffer
                 request = chr(address)+chr(0x01)+password
@@ -129,8 +147,12 @@ def sms_handler(address, password, A, loop = 0):
                     if loop == 0: return
                     else: continue
                 sendSMS(phone, energy_to_text(res, A))
+            if command == "reboot":
+                cmdAT('AT#REBOOT\r', 'OK', 5)
         if loop == 0: return
-        else: continue
+        else: 
+            MOD.sleep(10)
+            continue
     
 
 
