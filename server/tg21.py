@@ -234,7 +234,7 @@ def num_to_scale(percent_value, numsimb, add_percent=True, prefix="", value="", 
     if percent_value > 100: percent_value_scale = 100
     else: percent_value_scale = percent_value
     scale = "<s>"
-    blocks = ["　", "▏", "▎", "▍", "▌", "▋", "▊", "█"]
+    blocks = ["⠀", "▏", "▎", "▍", "▌", "▋", "▊", "█"]
     discretization = numsimb*7
     simbols = (percent_value_scale/100) * discretization
     full_simbols = int(simbols // 7)
@@ -245,7 +245,7 @@ def num_to_scale(percent_value, numsimb, add_percent=True, prefix="", value="", 
         scale += blocks[half_simbol]
     for i in range(numsimb-full_simbols-1):
         if i == 0 and full_simbols == 0 and half_simbol == 0: 
-            scale = "<s>▏　"
+            scale = "<s>▏⠀"
             continue
         scale += blocks[0]
 
@@ -259,7 +259,7 @@ def num_to_scale(percent_value, numsimb, add_percent=True, prefix="", value="", 
                     -(((len(text)-text.count('.')+text.count(' '))*k_letter)\
                     +text.count('.')*k_point+text.count(' ')*k_space))/2
         for i in range(int(round(start_pos))):
-            output_text += "　"
+            output_text += "⠀"
         output_text += text + "\n"
     if add_percent:
         scale += " "+str(round(percent_value))+'%'
@@ -273,7 +273,7 @@ def num_to_scale2(value, min, max, numsimb, add_value=True, prefix="", si=""):
         numsimb -= 1
     output_text = ""
     
-    blocks = ["　", "|", "▌"]
+    blocks = ["⠀", "|", "▌"]
 
     current_value = round(((value - min)/(max - min))*numsimb)
     if current_value > numsimb: current_value = numsimb-1
@@ -300,7 +300,7 @@ def num_to_scale2(value, min, max, numsimb, add_value=True, prefix="", si=""):
                     -(((len(text)-text.count('.')+text.count(' '))*k_letter)\
                     +text.count('.')*k_point+text.count(' ')*k_space))/2
         for i in range(int(round(start_pos))):
-            output_text += "　"
+            output_text += "⠀"
         output_text += text + "\n"
     if prefix:
         scale = prefix +scale
@@ -487,6 +487,18 @@ async def fota_send_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     
     file = await update.message.document.get_file()
+    file_name = update.message.document.file_name
+    if file_name == "bot.pyo": file_code = "0"
+    elif file_name == "sms.pyo": file_code = "1"
+    elif file_name == "crc16.pyo": file_code = "2"
+    else:
+        text += f"Недопустимое название файла: {file_name}."
+        try:
+            context.chat_data["last_message"] = await context.chat_data["last_message"].edit_text(
+                text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML"
+            )
+        except BadRequest: pass
+        return MAIN
     byte_file = await file.download_as_bytearray()
     file_length = len(byte_file)
     if file_length < 16000:
@@ -504,7 +516,7 @@ async def fota_send_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
         text = "FOTA:\n"
 
-        responce = await queue_tx_put(FOTA+str(file_length).encode()+EOF, True)
+        responce = await queue_tx_put(FOTA+file_code.encode()+str(file_length).encode()+EOF, True)
         #check responce
         if type(responce) == str:
             text += responce
@@ -527,7 +539,7 @@ async def fota_send_file(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
                     break
                 else:
                     if not FOTA in responce:
-                        text = "FOTA:\n"+responce[len[b'responce']:responce.find(b'%edn%')].decode()        
+                        text = "FOTA:\n"+responce[len[b'responce']:responce.find(b'%end%')].decode()        
                     else:
                         sended = int(responce[len(FOTA):].decode())
                         text = "FOTA:\n"+num_to_scale(round((sended/file_length)*100), 15)+"\n"+speed
@@ -564,7 +576,7 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     if context.user_data["user"].auth == "ADMIN":
         start_time = time.time()
-        text = "Reboot:\nВыполняю..."
+        text = "Reboot:\nКоманда отправлена"
         if len(REQUESTS) > 0:
             await update.message.reply_text(text=f'Канал связи с модемом занят пользователем {list(REQUESTS.values())[0]}, ваш запрос поставлен в очередь, ожидайте...', show_alert=True)
             REQUESTS.update({update.message.from_user.id : update.message.from_user.full_name})
@@ -732,7 +744,7 @@ async def power(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         else:
             fs = S_full_scale*power_dict["\ncosφ: "]
             si = " кВА"
-        text += num_to_scale((value/fs)*100,15,add_percent=True, prefix=key, value=value, si=si)+"\n"
+        text += num_to_scale((value/fs)*100,16,add_percent=True, prefix=key, value=value, si=si)+"\n"
     text += "\ncosφ: "+str(power_dict["\ncosφ: "])
     
     globals()["last_time_responce"] = str(round(time.time()-start_time, 2)) +" c"
@@ -806,7 +818,7 @@ async def voltage(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                     key = "Ub: "
                 else: 
                     key = "Uc: "
-                text += num_to_scale2(round(geted_value,2), 207, 253, 17, True, key, si)+"\n"
+                text += num_to_scale2(round(geted_value,2), 207, 253, 18, True, key, si)+"\n"
 
     globals()["last_time_responce"] = str(round(time.time()-start_time, 2)) +" c"
     try:
@@ -942,7 +954,7 @@ async def freq(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
             byte = int(bits, 2).to_bytes(1, byteorder='big')
             geted_value = int.from_bytes((byte+responce[2:4]), "big")/100
             si = " Гц"
-            text += num_to_scale2(round(geted_value, 2), 49.8, 50.2, 17, True, "", si)+"\n"
+            text += num_to_scale2(round(geted_value, 2), 49.8, 50.2, 18, True, "", si)+"\n"
             globals()["last_time_responce"] = str(round(time.time()-start_time, 2)) +" c"
     try:
         context.chat_data["last_message"] = await context.chat_data["last_message"].edit_text(
@@ -1111,7 +1123,7 @@ async def year(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     max_value = data[max(data, key=data.get)]
     for key, value in data.items():
-        text += num_to_scale(percent_value=(value/max_value)*100, numsimb=15, add_percent=False, prefix=key+": ", value=value, si="кВт*ч") +"\n"
+        text += num_to_scale(percent_value=(value/max_value)*100, numsimb=16, add_percent=False, prefix=key+": ", value=value, si="кВт*ч") +"\n"
 
     await update.callback_query.answer()
     try:
@@ -1168,7 +1180,7 @@ async def month(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         for key, value in data.items():
             if max_value: percent = value/max_value
             else: percent = 0
-            text += num_to_scale(percent_value=(percent)*100, numsimb=15, add_percent=False, prefix=key+": ", value=value, si="кВт*ч") +"\n"
+            text += num_to_scale(percent_value=(percent)*100, numsimb=16, add_percent=False, prefix=key+": ", value=value, si="кВт*ч") +"\n"
 
     else:
         text = "Cтатистика:\n\nВыберите месяц для показа статистики"
@@ -1234,7 +1246,7 @@ async def day(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         for key, value in data.items():
             if max_value: percent = value/max_value
             else: percent = 0
-            text += num_to_scale(percent_value=(percent)*100, numsimb=15, add_percent=False, prefix=key+": ", value=value, si="кВт*ч") +"\n"
+            text += num_to_scale(percent_value=(percent)*100, numsimb=16, add_percent=False, prefix=key+": ", value=value, si="кВт*ч") +"\n"
 
     #get month
     elif "0%m" in cb:
