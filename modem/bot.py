@@ -221,17 +221,19 @@ def main():
             device_online = check_device_addr485()
     else: device_online = 1
 
+    withsms = smsinit()
     #Only sms loop
-    if internet_off() == 1:
+    if internet_off() == 1 and withsms == 1:
+        #will reboot every 2 days
+        MOD.watchdogDisable()
+        MOD.watchdogEnable(172800)
         while(1==1):
             sms_handler(DEVICE_ADDRESS, DEVICE_PASSWORD, DEVICE_A)
-            MOD.watchdogReset()
             MOD.sleep(100)
     #socket config
     if (cmdAT('AT#SCFG=1,1,'+PKTSIZE+','+S_NO_DATA_TIMEOUT+','+S_CON_TIMEOUT+',50\r', 'OK', 2) == 0):
         cmdAT('AT#REBOOT\r', 'OK', 2)
     #main loop
-    withsms = smsinit()
     try_connect = 0
     fota_process = 0
     while(try_connect < 720):
